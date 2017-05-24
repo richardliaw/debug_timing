@@ -70,25 +70,29 @@ def train(num_workers, env_name="PongDeterministic-v4"):
   timing = []
   import time, numpy as np
   from misc import Profiler
-  profiler = Profiler()
-  while True:
-    with profiler:
-        done_id, gradient_list = ray.wait(gradient_list)
-        gradient, info = ray.get(done_id)[0]
-        policy.model_update(gradient)
-        parameters = policy.get_weights()
-        steps += 1
-        obs += info["size"]
-        gradient_list.extend(
-            [agents[info["id"]].compute_gradient.remote(parameters)])
+  #profiler = Profiler()
+  for i in range(100):
+    gradient_list, policy, obs = loop(gradient_list, agents, policy, obs)
   return policy
+
+
+@profile
+def loop(gradient_list, agents, policy, obs):
+  done_id, gradient_list = ray.wait(gradient_list)
+  gradient, info = ray.get(done_id)[0]
+  policy.model_update(gradient)
+  parameters = policy.get_weights()
+  obs += info["size"]
+  gradient_list.extend(
+      [agents[info["id"]].compute_gradient.remote(parameters)])
+  return gradient_list, policy, obs
 
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Run A3C on Ray")
   parser.add_argument("--runners", default=16, type=int,
                       help="Number of simulation workers")
-  parser.add_argument("--environment", default="PongDeterministic-v3",
+  parser.add_argument("--environment", default="PongDeterministic-v4",
                       type=str, help="The gym environment to use.")
 
   args = parser.parse_args()

@@ -35,10 +35,10 @@ class Profiler(object):
     if self.counter % self.thres == 0:
         self.pr.disable()
         self.enabled = False
-        s = io.StringIO()
-        sortby = "cumtime"
-        ps = pstats.Stats(self.pr, stream=s).sort_stats(sortby)
-        self.temp['ps'] = ps
-        ps.print_stats(.2)
-        print(s.getvalue())
+        ps = pstats.Stats(self.pr)
+        #p_items =  sorted(ps.stats.items(), key=lambda kv: kv[1][2] / kv[1][0])[-20:]
+        #p_items = [(k, tuple([i, v[0]]) + v[2:]) for i, (k, v) in enumerate(p_items)]
+        #ps.stats = {k: v for k, v in p_items}
+        #ps.sort_stats('tottime')
+        ps.print_stats()
         import ipdb; ipdb.set_trace()
