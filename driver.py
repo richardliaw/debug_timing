@@ -80,7 +80,7 @@ def train(num_workers, env_name="PongDeterministic-v4"):
 def loop(gradient_list, agents, policy, obs):
   done_id, gradient_list = ray.wait(gradient_list)
   gradient, info = ray.get(done_id)[0]
-  policy.model_update(gradient)
+  policy.async_model_update(gradient)
   parameters = policy.get_weights()
   obs += info["size"]
   gradient_list.extend(

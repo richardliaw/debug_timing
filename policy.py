@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import threading
 import tensorflow as tf
 import ray
 
@@ -65,13 +66,16 @@ class Policy(object):
   def initialize(self):
     self.sess = tf.Session(graph=self.g, config=tf.ConfigProto(
         intra_op_parallelism_threads=1, inter_op_parallelism_threads=2))
-    self.variables = ray.experimental.TensorFlowVariables(self.loss, self.sess)
+    self.variables = ray.experimental.TensorFlowVariables(self._apply_gradients, self.sess) # share optimizer
     self.sess.run(tf.global_variables_initializer())
 
   def model_update(self, grads):
     feed_dict = {self.grads[i]: grads[i]
                  for i in range(len(grads))}
     self.sess.run(self._apply_gradients, feed_dict=feed_dict)
+
+  def async_model_update(self, grads):
+    AsyncUpdateThread(self, grads)
 
   def get_weights(self):
     weights = self.variables.get_weights()
@@ -91,6 +95,18 @@ class Policy(object):
 
   def value(self, ob):
     raise NotImplementedError
+
+class AsyncUpdateThread(threading.Thread):
+    """ This thread updates the master copy of the Policy """
+    def __init__(self, policy, grads):
+        threading.Thread.__init__(self)
+        self.policy = policy
+        self.grads = grads
+        self.start()
+
+    def run(self):
+        print('async_udpate')
+        self.policy.model_update(self.grads)
 
 
 def normalized_columns_initializer(std=1.0):
