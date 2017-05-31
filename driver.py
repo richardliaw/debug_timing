@@ -58,7 +58,7 @@ class Runner(object):
     return gradient, info
 
 
-def train(num_workers, env_name="PongDeterministic-v4"):
+def train(num_workers, env_name="PongDeterministic-v3"):
   env = create_env(env_name)
   policy = LSTMPolicy(env.observation_space.shape, env.action_space.n, 0)
   agents = [Runner.remote(env_name, i) for i in range(num_workers)]
@@ -70,18 +70,30 @@ def train(num_workers, env_name="PongDeterministic-v4"):
   timing = []
   import time, numpy as np
   from misc import Profiler
-  #profiler = Profiler()
-  for i in range(100):
-    gradient_list, policy, obs = loop(gradient_list, agents, policy, obs)
+  profiler = Profiler()
+  from line_profiler import LineProfiler
+  prof = LineProfiler()
+  p_loop = prof(loop)
+  for i in range(2000):
+    gradient_list, policy, obs = p_loop(gradient_list, agents, policy, obs)
+  prof.print_stats()
+  #with profiler:
+  #  for i in range(1000):
+  #    gradient_list, policy, obs = loop(gradient_list, agents, policy, obs)
+  #import ipdb; ipdb.set_trace()
+
+    
   return policy
 
 
-@profile
+#@profile
+import threading 
 def loop(gradient_list, agents, policy, obs):
   done_id, gradient_list = ray.wait(gradient_list)
   gradient, info = ray.get(done_id)[0]
   policy.async_model_update(gradient)
-  parameters = policy.get_weights()
+  # policy.model_update(gradient)
+  parameters = policy.get_weights(cached=True)
   obs += info["size"]
   gradient_list.extend(
       [agents[info["id"]].compute_gradient.remote(parameters)])
@@ -92,7 +104,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Run A3C on Ray")
   parser.add_argument("--runners", default=16, type=int,
                       help="Number of simulation workers")
-  parser.add_argument("--environment", default="PongDeterministic-v4",
+  parser.add_argument("--environment", default="PongDeterministic-v3",
                       type=str, help="The gym environment to use.")
 
   args = parser.parse_args()

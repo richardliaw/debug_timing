@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import numpy as np
 import threading
+import time
 import tensorflow as tf
 import ray
 
@@ -66,8 +67,11 @@ class Policy(object):
   def initialize(self):
     self.sess = tf.Session(graph=self.g, config=tf.ConfigProto(
         intra_op_parallelism_threads=1, inter_op_parallelism_threads=2))
-    self.variables = ray.experimental.TensorFlowVariables(self._apply_gradients, self.sess) # share optimizer
+    # self.variables = ray.experimental.TensorFlowVariables(self._apply_gradients, self.sess) # share optimizer
+    self.variables = ray.experimental.TensorFlowVariables(self.loss, self.sess) # share optimizer
+    
     self.sess.run(tf.global_variables_initializer())
+    self._params = self.get_weights()
 
   def model_update(self, grads):
     feed_dict = {self.grads[i]: grads[i]
@@ -77,11 +81,13 @@ class Policy(object):
   def async_model_update(self, grads):
     AsyncUpdateThread(self, grads)
 
-  def get_weights(self):
-    weights = self.variables.get_weights()
-    return weights
+  def get_weights(self, cached=False):
+    if not cached:
+      self._params = self.variables.get_weights()
+    return self._params
 
   def set_weights(self, weights):
+    self._params = weights
     self.variables.set_weights(weights)
 
   def get_gradients(self, batch):
@@ -102,11 +108,13 @@ class AsyncUpdateThread(threading.Thread):
         threading.Thread.__init__(self)
         self.policy = policy
         self.grads = grads
+        if threading.active_count() > 5:
+          time.sleep(0.007)
         self.start()
 
     def run(self):
-        print('async_udpate')
         self.policy.model_update(self.grads)
+        self.policy.get_weights(cached=False) # refresh cache
 
 
 def normalized_columns_initializer(std=1.0):
