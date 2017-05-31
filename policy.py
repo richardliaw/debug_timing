@@ -6,6 +6,7 @@ import numpy as np
 import threading
 import time
 import tensorflow as tf
+import six.moves.queue as queue
 import ray
 
 
@@ -79,7 +80,11 @@ class Policy(object):
     self.sess.run(self._apply_gradients, feed_dict=feed_dict)
 
   def async_model_update(self, grads):
-    AsyncUpdateThread(self, grads)
+    self.queue.put(grads)
+
+  def setup_async(self):
+    self.queue = queue.Queue(5)
+    self.authreads = [UpdateThread(self.queue) for i in range(2)]
 
   def get_weights(self, cached=False):
     if not cached:
@@ -102,18 +107,18 @@ class Policy(object):
   def value(self, ob):
     raise NotImplementedError
 
-class AsyncUpdateThread(threading.Thread):
+class UpdateThread(threading.Thread):
     """ This thread updates the master copy of the Policy """
-    def __init__(self, policy, grads):
+    def __init__(self, policy, queue):
         threading.Thread.__init__(self)
         self.policy = policy
-        self.grads = grads
-        if threading.active_count() > 5:
-          time.sleep(0.007)
+        self.q = queue
         self.start()
 
     def run(self):
-        self.policy.model_update(self.grads)
+      while True:
+        gradient = self.q.get(timeout=600.0)
+        self.policy.model_update(gradient)
         self.policy.get_weights(cached=False) # refresh cache
 
 
