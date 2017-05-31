@@ -69,35 +69,20 @@ def train(num_workers, env_name="PongDeterministic-v3"):
   obs = 0
   timing = []
   import time, numpy as np
-  from misc import Profiler
-  profiler = Profiler()
-  from line_profiler import LineProfiler
-  prof = LineProfiler()
-  p_loop = prof(loop)
   for i in range(2000):
-    gradient_list, policy, obs = p_loop(gradient_list, agents, policy, obs)
-  prof.print_stats()
-  #with profiler:
-  #  for i in range(1000):
-  #    gradient_list, policy, obs = loop(gradient_list, agents, policy, obs)
-  #import ipdb; ipdb.set_trace()
-
-    
+    done_id, gradient_list = ray.wait(gradient_list)
+    gradient, info = ray.get(done_id)[0]
+    policy.model_update(gradient)
+    parameters = policy.get_weights(cached=True)
+    obs += info["size"]
+    gradient_list.extend(
+        [agents[info["id"]].compute_gradient.remote(parameters)])
   return policy
 
 
-#@profile
-import threading 
-def loop(gradient_list, agents, policy, obs):
-  done_id, gradient_list = ray.wait(gradient_list)
-  gradient, info = ray.get(done_id)[0]
-  policy.async_model_update(gradient)
-  # policy.model_update(gradient)
-  parameters = policy.get_weights(cached=True)
-  obs += info["size"]
-  gradient_list.extend(
-      [agents[info["id"]].compute_gradient.remote(parameters)])
-  return gradient_list, policy, obs
+# #@profile
+# import threading 
+# def loop(gradient_list, agents, policy, obs):
 
 
 if __name__ == "__main__":
@@ -112,4 +97,14 @@ if __name__ == "__main__":
   env_name = args.environment
 
   ray.init(num_cpus=runners)
-  train(runners, env_name=env_name)
+
+  # from misc import Profiler
+  # profiler = Profiler()
+  from line_profiler import LineProfiler
+  prof = LineProfiler()
+
+  p_train = prof(train)
+  
+  p_train(runners, env_name=env_name)
+
+  prof.print_stats()
