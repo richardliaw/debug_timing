@@ -84,7 +84,7 @@ class Policy(object):
 
   def setup_async(self):
     self.queue = queue.Queue(5)
-    self.authreads = [UpdateThread(self.queue) for i in range(2)]
+    self.authreads = [UpdateThread(self, self.queue) for i in range(2)]
 
   def get_weights(self, cached=False):
     if not cached:
