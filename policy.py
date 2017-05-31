@@ -82,9 +82,9 @@ class Policy(object):
   def async_model_update(self, grads):
     self.queue.put(grads)
 
-  def setup_async(self):
+  def setup_async(self, threads=2):
     self.queue = queue.Queue(5)
-    self.authreads = [UpdateThread(self, self.queue) for i in range(2)]
+    self.authreads = [UpdateThread(self, self.queue) for i in range(threads)]
 
   def get_weights(self, cached=False):
     if not cached:
