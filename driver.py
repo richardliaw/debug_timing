@@ -12,6 +12,8 @@ import tensorflow as tf
 from envs import create_env
 from runner import RunnerThread, process_rollout
 from LSTM import LSTMPolicy
+from ps import ParameterServer
+from misc import parameter_delta
 
 
 @ray.remote
@@ -57,25 +59,30 @@ class Runner(object):
             "size": len(batch.a)}
     return gradient, info
 
+  def get_delta(self, params):
+    gradient, info = self.compute_gradient(params)
+    self.policy.model_update(gradient)
+    new_params = self.policy.get_weights()
+    return parameter_delta(new_params, params)
+
 
 def train(num_workers, env_name="PongDeterministic-v3"):
   env = create_env(env_name)
-  policy = LSTMPolicy(env.observation_space.shape, env.action_space.n, 0)
-  policy.setup_async(2)
+  ps = ParameterServer(env)
+  parameters = ps.get_weights()
   agents = [Runner.remote(env_name, i) for i in range(num_workers)]
-  parameters = policy.get_weights()
-  gradient_list = [agent.compute_gradient.remote(parameters)
+  delta_list = [agent.get_delta.remote(parameters)
                    for agent in agents]
   steps = 0
   obs = 0
   timing = []
   for i in range(2000):
-    done_id, gradient_list = ray.wait(gradient_list)
-    gradient, info = ray.get(done_id)[0]
-    policy.async_model_update(gradient)
-    parameters = policy.get_weights(cached=True)
+    done_id, delta_list = ray.wait(delta_list)
+    delta, info = ray.get(done_id)[0]
+    ps.add_delta(delta) 
+    parameters = ps.weights
     obs += info["size"]
-    gradient_list.extend(
+    delta_list.extend(
         [agents[info["id"]].compute_gradient.remote(parameters)])
   return policy
 

@@ -11,6 +11,13 @@ import pstats
 def timestamp():
   return datetime.now().timestamp()
 
+def parameter_delta(new_params, old_params):
+    result = {k: new_params[k] - old_params[k] for k in new_params}
+    return result
+
+def add_delta(params, delta, step=1.):
+    result = {k: params[k] + step * delta[k] for k in new_params}
+    return result
 
 def time_string():
   return datetime.now().strftime("%Y%m%d_%H_%M_%f")
