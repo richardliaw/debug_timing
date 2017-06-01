@@ -63,7 +63,7 @@ class Runner(object):
     gradient, info = self.compute_gradient(params)
     self.policy.model_update(gradient)
     new_params = self.policy.get_weights()
-    return parameter_delta(new_params, params)
+    return parameter_delta(new_params, params), info
 
 
 def train(num_workers, env_name="PongDeterministic-v3"):
@@ -83,8 +83,8 @@ def train(num_workers, env_name="PongDeterministic-v3"):
     parameters = ps.weights
     obs += info["size"]
     delta_list.extend(
-        [agents[info["id"]].compute_gradient.remote(parameters)])
-  return policy
+        [agents[info["id"]].get_delta.remote(parameters)])
+  return ps.get_policy()
 
 
 # #@profile

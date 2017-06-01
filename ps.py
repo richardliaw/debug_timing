@@ -1,4 +1,5 @@
 import numpy as np
+from LSTM import LSTMPolicy
 from misc import add_delta
 
 class ParameterServer():
@@ -13,5 +14,8 @@ class ParameterServer():
   def async_add(self, delta):
     pass
 
-  def get_weights():
+  def get_weights(self):
     return self.weights
+
+  def get_policy(self):
+    return self._policy

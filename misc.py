@@ -16,7 +16,9 @@ def parameter_delta(new_params, old_params):
     return result
 
 def add_delta(params, delta, step=1.):
-    result = {k: params[k] + step * delta[k] for k in new_params}
+    if type(delta) == list:
+        import ipdb; ipdb.set_trace()
+    result = {k: params[k] + step * delta[k] for k in params}
     return result
 
 def time_string():
