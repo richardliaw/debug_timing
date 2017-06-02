@@ -5,6 +5,7 @@ from __future__ import print_function
 import argparse
 import os
 import ray
+import time
 import six.moves.queue as queue
 import sys
 import tensorflow as tf
@@ -54,7 +55,9 @@ class Runner(object):
     self.policy.set_weights(params)
     rollout = self.pull_batch_from_queue()
     batch = process_rollout(rollout, gamma=0.99, lambda_=1.0)
-    gradient = self.policy.get_gradients(batch)
+    gradient, summinfo = self.policy.get_gradients(batch, summarize=True)
+    self.summary_writer.add_summary(tf.Summary.FromString(summinfo), self.policy.local_steps)
+    self.summary_writer.flush()
     info = {"id": self.id,
             "size": len(batch.a)}
     return gradient, info
@@ -70,16 +73,19 @@ def train(num_workers, env_name="PongDeterministic-v3"):
   env = create_env(env_name)
   ps = ParameterServer(env)
   parameters = ps.get_weights()
-  agents = [Runner.remote(env_name, i) for i in range(num_workers)]
+  agents = []
+  for i in range(num_workers):
+    agents.append(Runner.remote(env_name, i))
+    time.sleep(0.3)
   delta_list = [agent.get_delta.remote(parameters)
                    for agent in agents]
   steps = 0
   obs = 0
   timing = []
-  for i in range(2000):
+  while True:
     done_id, delta_list = ray.wait(delta_list)
     delta, info = ray.get(done_id)[0]
-    ps.add_delta(delta) 
+    ps.add_delta(delta, 0.1) 
     parameters = ps.weights
     obs += info["size"]
     delta_list.extend(
@@ -105,13 +111,13 @@ if __name__ == "__main__":
 
   ray.init(num_cpus=runners)
 
-  # from misc import Profiler
-  # profiler = Profiler()
-  from line_profiler import LineProfiler
-  prof = LineProfiler()
+  # from line_profiler import LineProfiler
+  # prof = LineProfiler()
 
-  p_train = prof(train)
-  
-  p_train(runners, env_name=env_name)
+  # p_train = prof(train)
+  # 
+  # p_train(runners, env_name=env_name)
+  train(runners, env_name=env_name)
 
-  prof.print_stats()
+  # prof.print_stats()
+

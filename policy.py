@@ -45,7 +45,6 @@ class Policy(object):
 
     # loss of value function
     vf_loss = 0.5 * tf.reduce_sum(tf.square(self.vf - self.r))
-    vf_loss = tf.Print(vf_loss, [vf_loss], "Value Fn Loss")
     entropy = - tf.reduce_sum(prob_tf * log_prob_tf)
 
     bs = tf.to_float(tf.shape(self.x)[0])
@@ -62,14 +61,16 @@ class Policy(object):
       tf.summary.scalar("model/policy_loss", pi_loss / bs)
       tf.summary.scalar("model/value_loss", vf_loss / bs)
       tf.summary.scalar("model/entropy", entropy / bs)
-      tf.summary.image("model/state", self.x)
+      tf.summary.scalar("model/grad_global_norm", tf.global_norm(grads))
+      tf.summary.scalar("model/var_global_norm", tf.global_norm(self.var_list))
+      # tf.summary.image("model/state", self.x)
       self.summary_op = tf.summary.merge_all()
 
   def initialize(self):
     self.sess = tf.Session(graph=self.g, config=tf.ConfigProto(
         intra_op_parallelism_threads=1, inter_op_parallelism_threads=2))
     # self.variables = ray.experimental.TensorFlowVariables(self._apply_gradients, self.sess) # share optimizer
-    self.variables = ray.experimental.TensorFlowVariables(self.loss, self.sess) # share optimizer
+    self.variables = ray.experimental.TensorFlowVariables(self.loss, self.sess) 
     
     self.sess.run(tf.global_variables_initializer())
     self._params = self.get_weights()

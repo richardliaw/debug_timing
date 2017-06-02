@@ -64,7 +64,7 @@ class LSTMPolicy(Policy):
         initializer=tf.constant_initializer(0, dtype=tf.int32),
         trainable=False)
 
-  def get_gradients(self, batch):
+  def get_gradients(self, batch, summarize=False):
     """Computing the gradient is actually model-dependent.
 
     The LSTM needs its hidden states in order to compute the gradient
@@ -79,7 +79,10 @@ class LSTMPolicy(Policy):
         self.state_in[1]: batch.features[1]
     }
     self.local_steps += 1
-    return self.sess.run(self.grads, feed_dict=feed_dict)
+    summary = None
+    if summarize:
+        grad, summary = self.sess.run([self.grads, self.summary_op], feed_dict=feed_dict)
+    return self.sess.run(self.grads, feed_dict=feed_dict), summary
 
   def act(self, ob, c, h):
     return self.sess.run([self.sample, self.vf] + self.state_out,

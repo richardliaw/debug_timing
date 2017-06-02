@@ -8,8 +8,8 @@ class ParameterServer():
     self.weights = self._policy.get_weights()
     # may need to change this into a model
 
-  def add_delta(self, delta):
-    self.weights = add_delta(self.weights, delta)
+  def add_delta(self, delta, stepsize=1.):
+    self.weights = add_delta(self.weights, delta, stepsize)
 
   def async_add(self, delta):
     pass
