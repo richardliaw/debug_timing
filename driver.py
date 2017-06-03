@@ -85,7 +85,7 @@ def train(num_workers, env_name="PongDeterministic-v3"):
   while True:
     done_id, delta_list = ray.wait(delta_list)
     delta, info = ray.get(done_id)[0]
-    ps.add_delta(delta, 0.1) 
+    ps.add_delta(delta) #, 0.01) 
     parameters = ps.weights
     obs += info["size"]
     delta_list.extend(
