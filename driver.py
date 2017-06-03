@@ -62,34 +62,33 @@ class Runner(object):
             "size": len(batch.a)}
     return gradient, info
 
-  def get_delta(self, params):
-    gradient, info = self.compute_gradient(params)
-    self.policy.model_update(gradient)
-    new_params = self.policy.get_weights()
-    return parameter_delta(new_params, params), info
+  def apply_delta(self, delta):
+    for k in self.weights:
+        self.weights[k] += delta[k]
+
+  def start_train(self, params):
+    self.weights = params
+    while True:
+        gradient, info = self.compute_gradient(self.weights)
+        self.policy.model_update(gradient)
+        new_params = self.policy.get_weights()
+        delta = parameter_delta(new_params, params)
+        self.apply_delta(delta)
+
 
 
 def train(num_workers, env_name="PongDeterministic-v3"):
   env = create_env(env_name)
   ps = ParameterServer(env)
   parameters = ps.get_weights()
+  p_id = ray.put(parameters)
   agents = []
   for i in range(num_workers):
     agents.append(Runner.remote(env_name, i))
     time.sleep(0.3)
-  delta_list = [agent.get_delta.remote(parameters)
+  delta_list = [agent.start_train.remote(p_id)
                    for agent in agents]
-  steps = 0
-  obs = 0
-  timing = []
-  while True:
-    done_id, delta_list = ray.wait(delta_list)
-    delta, info = ray.get(done_id)[0]
-    ps.add_delta(delta) #, 0.01) 
-    parameters = ps.weights
-    obs += info["size"]
-    delta_list.extend(
-        [agents[info["id"]].get_delta.remote(parameters)])
+  ray.get(delta_list)
   return ps.get_policy()
 
 
