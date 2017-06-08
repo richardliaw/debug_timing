@@ -104,12 +104,18 @@ if __name__ == "__main__":
                       help="Number of simulation workers")
   parser.add_argument("--environment", default="PongDeterministic-v3",
                       type=str, help="The gym environment to use.")
+  parser.add_argument("--redis", default=None,
+                      type=str, help="Redis Address")
+
 
   args = parser.parse_args()
   runners = args.runners
   env_name = args.environment
-
-  ray.init(num_cpus=runners)
+  addr = args.redis
+  if addr:
+    ray.init(redis_address=addr)
+  else:
+    ray.init(num_cpus=runners)
 
   # from line_profiler import LineProfiler
   # prof = LineProfiler()
