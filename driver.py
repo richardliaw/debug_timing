@@ -5,10 +5,12 @@ from __future__ import print_function
 import argparse
 import os
 import ray
+import numpy as np
 import time
 import six.moves.queue as queue
 import sys
 import tensorflow as tf
+import atomicarray
 
 from envs import create_env
 from runner import RunnerThread, process_rollout
@@ -17,7 +19,7 @@ from ps import ParameterServer
 from misc import parameter_delta
 
 
-@ray.remote
+#@ray.remote
 class Runner(object):
   """Actor object to start running simulation on workers.
 
@@ -63,30 +65,42 @@ class Runner(object):
     return gradient, info
 
   def apply_delta(self, delta):
+    flattened = {k: v.flatten() for k, v in delta.items()}
+    db = self.weights
     for k in self.weights:
-        self.weights[k] += delta[k]
+        atomicarray.increment(self.weights[k], flattened[k])
+        # self.weights[k] += delta[k]
 
-  def start_train(self, params):
+  def start_train(self, params, shapes):
+    params = ray.get(params)
+    shapes = ray.get(shapes)
     self.weights = params
-    while True:
-        gradient, info = self.compute_gradient(self.weights)
+    self.shapes = shapes
+    for i in range(2000):
+        import ipdb; ipdb.set_trace()
+        cur_weights = {k: v.reshape(self.shapes[k]) for k, v in self.weights.items()}
+        gradient, info = self.compute_gradient(cur_weights)
         self.policy.model_update(gradient)
         new_params = self.policy.get_weights()
-        delta = parameter_delta(new_params, params)
+        delta = parameter_delta(new_params, cur_weights)
         self.apply_delta(delta)
-
 
 
 def train(num_workers, env_name="PongDeterministic-v3"):
   env = create_env(env_name)
   ps = ParameterServer(env)
   parameters = ps.get_weights()
-  p_id = ray.put(parameters)
+  import ipdb; ipdb.set_trace()
+
+  flattened_params = {k: v.flatten() for k, v in parameters.items()}
+  shapes = {k:v.shape for k, v in parameters.items()}
+  p_id = ray.put(flattened_params)
+  s_id = ray.put(shapes)
   agents = []
   for i in range(num_workers):
-    agents.append(Runner.remote(env_name, i))
+    agents.append(Runner(env_name, i))
     time.sleep(0.3)
-  delta_list = [agent.start_train.remote(p_id)
+  delta_list = [agent.start_train(p_id, s_id)
                    for agent in agents]
   ray.get(delta_list)
   return ps.get_policy()
