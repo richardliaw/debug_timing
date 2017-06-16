@@ -17,9 +17,9 @@ from runner import RunnerThread, process_rollout
 from LSTM import LSTMPolicy
 from ps import ParameterServer
 from misc import parameter_delta
+norm = lambda x: np.linalg.norm(x)
 
-
-#@ray.remote
+@ray.remote
 class Runner(object):
   """Actor object to start running simulation on workers.
 
@@ -66,18 +66,18 @@ class Runner(object):
 
   def apply_delta(self, delta):
     flattened = {k: v.flatten() for k, v in delta.items()}
-    db = self.weights
     for k in self.weights:
         atomicarray.increment(self.weights[k], flattened[k])
         # self.weights[k] += delta[k]
 
   def start_train(self, params, shapes):
-    params = ray.get(params)
-    shapes = ray.get(shapes)
     self.weights = params
     self.shapes = shapes
+    delta = {k: np.random.random_sample(self.shapes[k]) for k in self.shapes}
+    self.apply_delta(delta)
+    print([(k, norm(w)) for k, w in self.weights.items()])
+    import ipdb; ipdb.set_trace()
     for i in range(2000):
-        import ipdb; ipdb.set_trace()
         cur_weights = {k: v.reshape(self.shapes[k]) for k, v in self.weights.items()}
         gradient, info = self.compute_gradient(cur_weights)
         self.policy.model_update(gradient)
@@ -90,17 +90,15 @@ def train(num_workers, env_name="PongDeterministic-v3"):
   env = create_env(env_name)
   ps = ParameterServer(env)
   parameters = ps.get_weights()
-  import ipdb; ipdb.set_trace()
-
-  flattened_params = {k: v.flatten() for k, v in parameters.items()}
+  flattened_params = {k: np.array(v.flatten(), copy=True) for k, v in parameters.items()}
   shapes = {k:v.shape for k, v in parameters.items()}
   p_id = ray.put(flattened_params)
   s_id = ray.put(shapes)
   agents = []
   for i in range(num_workers):
-    agents.append(Runner(env_name, i))
+    agents.append(Runner.remote(env_name, i))
     time.sleep(0.3)
-  delta_list = [agent.start_train(p_id, s_id)
+  delta_list = [agent.start_train.remote(p_id, s_id)
                    for agent in agents]
   ray.get(delta_list)
   return ps.get_policy()
