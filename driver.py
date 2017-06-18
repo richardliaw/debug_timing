@@ -65,34 +65,38 @@ class Runner(object):
     return gradient, info
 
   def apply_delta(self, delta):
-    flattened = {k: v.flatten() for k, v in delta.items()}
+    flattened_deltas = {k: (w * np.ones(w.shape)).flatten() for k, w in delta.items()} # TEMP
     for k in self.weights:
-        atomicarray.increment(self.weights[k], flattened[k])
+      assert self.weights[k].dtype == np.float64 # TEMP
+      atomicarray.increment(self.weights[k], flattened_deltas[k])
         # self.weights[k] += delta[k]
 
   def start_train(self, params, shapes):
     self.weights = params
     self.shapes = shapes
-    delta = {k: np.random.random_sample(self.shapes[k]) for k in self.shapes}
-    self.apply_delta(delta)
-    print([(k, norm(w)) for k, w in self.weights.items()])
-    import ipdb; ipdb.set_trace()
-    for i in range(2000):
+    # print([(k, norm(w)) for k, w in self.weights.items()])
+    # delta = {k: np.random.random_sample(w.shape) for k, w in self.weights.items()}
+    # self.apply_delta(params, delta)
+    # print([(k, norm(w)) for k, w in self.weights.items()])
+    # import ipdb; ipdb.set_trace()
+    for i in range(10):
         cur_weights = {k: v.reshape(self.shapes[k]) for k, v in self.weights.items()}
         gradient, info = self.compute_gradient(cur_weights)
         self.policy.model_update(gradient)
         new_params = self.policy.get_weights()
         delta = parameter_delta(new_params, cur_weights)
         self.apply_delta(delta)
+        print([(k, norm(w)) for k, w in self.weights.items()])
 
 
-def train(num_workers, env_name="PongDeterministic-v3"):
+def train(num_workers, env_name="PongDeterministic-v4"):
   env = create_env(env_name)
   ps = ParameterServer(env)
   parameters = ps.get_weights()
-  flattened_params = {k: np.array(v.flatten(), copy=True) for k, v in parameters.items()}
   shapes = {k:v.shape for k, v in parameters.items()}
-  p_id = ray.put(flattened_params)
+  parameters = {k: (w * np.ones(w.shape)).flatten() for k, w in parameters.items()} # TEMP
+  # flattened_params = {k: np.array(v.flatten(), copy=True) for k, v in parameters.items()}
+  p_id = ray.put(parameters)
   s_id = ray.put(shapes)
   agents = []
   for i in range(num_workers):
@@ -111,9 +115,9 @@ def train(num_workers, env_name="PongDeterministic-v3"):
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Run A3C on Ray")
-  parser.add_argument("--runners", default=16, type=int,
+  parser.add_argument("--runners", default=1, type=int,
                       help="Number of simulation workers")
-  parser.add_argument("--environment", default="PongDeterministic-v3",
+  parser.add_argument("--environment", default="PongDeterministic-v4",
                       type=str, help="The gym environment to use.")
 
   args = parser.parse_args()
