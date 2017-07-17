@@ -77,13 +77,17 @@ class Runner(object):
   def start_train(self, params, shapes):
     self.weights = params
     self.shapes = shapes
+    timing = []
     while True:
-        self.local_weights = {k: v.reshape(self.shapes[k]) for k, v in self.weights.items()}
-        gradient, info = self.compute_gradient(self.local_weights)
-        self.policy.model_update(gradient)
-        new_params = self.policy.get_weights()
-        delta = parameter_delta(new_params, self.local_weights)
-        self.apply_delta(delta)
+        cur_timing = []
+        cur_timing.append(time.time()); self.local_weights = {k: v.reshape(self.shapes[k]) for k, v in self.weights.items()}
+        cur_timing.append(time.time()); gradient, info = self.compute_gradient(self.local_weights)
+        cur_timing.append(time.time()); self.policy.model_update(gradient)
+        cur_timing.append(time.time()); new_params = self.policy.get_weights()
+        cur_timing.append(time.time()); delta = parameter_delta(new_params, self.local_weights)
+        cur_timing.append(time.time()); self.apply_delta(delta)
+        cur_timing.append(time.time()); timing.append(cur_timing)
+    return timing
 
 
 def train(num_workers, env_name="PongDeterministic-v3"):
