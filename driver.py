@@ -106,6 +106,8 @@ def train(num_workers, env_name="PongDeterministic-v3"):
   delta_list = [agent.start_train.remote(p_id, s_id)
                    for agent in agents]
   data = ray.get(delta_list)
+  import pickle
+  dump = lambda x: pickle.dump(data, open(x, 'wb'))
   import ipdb; ipdb.set_trace()
   return ps.get_policy()
 

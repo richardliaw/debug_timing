@@ -30,6 +30,7 @@ class Actor():
 if __name__ == '__main__':
     ray.init()
     shared_dict = {k: np.random.random_sample((2,2)) for k in range(5)}
+    print(shared_dict)
     flattened = {k:v.flatten() for k, v in shared_dict.items()}
     sid = ray.put(flattened)
     actors = [Actor.remote(i) for i in range(3)]
