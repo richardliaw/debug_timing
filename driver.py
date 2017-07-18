@@ -78,7 +78,7 @@ class Runner(object):
     self.weights = params
     self.shapes = shapes
     timing = []
-    while True:
+    for i in range(200):
         cur_timing = []
         cur_timing.append(time.time()); self.local_weights = {k: v.reshape(self.shapes[k]) for k, v in self.weights.items()}
         cur_timing.append(time.time()); gradient, info = self.compute_gradient(self.local_weights)
@@ -95,7 +95,6 @@ def train(num_workers, env_name="PongDeterministic-v3"):
   ps = ParameterServer(env)
   parameters = ps.get_weights()
   shapes = {k:v.shape for k, v in parameters.items()}
-  import ipdb; ipdb.set_trace()
   parameters = {k: (w * np.ones(w.shape)).flatten() for k, w in parameters.items()} # TEMP
   # flattened_params = {k: np.array(v.flatten(), copy=True) for k, v in parameters.items()}
   p_id = ray.put(parameters)
@@ -106,7 +105,8 @@ def train(num_workers, env_name="PongDeterministic-v3"):
     time.sleep(0.3)
   delta_list = [agent.start_train.remote(p_id, s_id)
                    for agent in agents]
-  ray.get(delta_list)
+  data = ray.get(delta_list)
+  import ipdb; ipdb.set_trace()
   return ps.get_policy()
 
 
