@@ -18,7 +18,7 @@ class Actor():
         delta = {k: 0.1 * np.ones_like(self.weights[k]) for k in self.weights}
         self.apply_delta(delta)
 
-    def loop_inc(self, shared, n=00):
+    def loop_inc(self, shared, n=2):
         self.weights = shared
         print([(k, norm(w)) for k, w in self.weights.items()])
 
