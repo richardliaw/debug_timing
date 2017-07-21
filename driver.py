@@ -54,15 +54,17 @@ class Runner(object):
     self.runner.start_runner(self.policy.sess, summary_writer)
 
   def compute_gradient(self, params):
-    self.policy.set_weights(params)
-    self.local_weights = self.policy.get_weights()
-    rollout = self.pull_batch_from_queue()
-    batch = process_rollout(rollout, gamma=0.99, lambda_=1.0)
-    gradient, summinfo = self.policy.get_gradients(batch, summarize=True)
-    self.summary_writer.add_summary(tf.Summary.FromString(summinfo), self.policy.local_steps)
+    timing = []
+    timing.append(time.time()); self.policy.set_weights(params)
+    timing.append(time.time()); self.local_weights = self.policy.get_weights()
+    timing.append(time.time()); rollout = self.pull_batch_from_queue()
+    timing.append(time.time()); batch = process_rollout(rollout, gamma=0.99, lambda_=1.0)
+    timing.append(time.time()); gradient, summinfo = self.policy.get_gradients(batch, summarize=True)
+    timing.append(time.time()); self.summary_writer.add_summary(tf.Summary.FromString(summinfo), self.policy.local_steps)
     self.summary_writer.flush()
     info = {"id": self.id,
-            "size": len(batch.a)}
+            "size": len(batch.a),
+            "time": timing}
     return gradient, info
 
   def apply_delta(self, delta):
@@ -82,11 +84,12 @@ class Runner(object):
         cur_timing = []
         cur_timing.append(time.time()); self.local_weights = {k: v.reshape(self.shapes[k]) for k, v in self.weights.items()}
         cur_timing.append(time.time()); gradient, info = self.compute_gradient(self.local_weights)
+        cur_timing.extend(info['time']);
         cur_timing.append(time.time()); self.policy.model_update(gradient)
         cur_timing.append(time.time()); new_params = self.policy.get_weights()
         cur_timing.append(time.time()); delta = parameter_delta(new_params, self.local_weights)
         cur_timing.append(time.time()); self.apply_delta(delta)
-        cur_timing.append(time.time()); timing.append(cur_timing)
+        cur_timing.append(time.time());  timing.append(cur_timing)
     return timing
 
 
