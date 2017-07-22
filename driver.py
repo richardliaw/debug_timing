@@ -10,6 +10,8 @@ import time
 import six.moves.queue as queue
 import sys
 import tensorflow as tf
+from tensorflow.python.client import timeline
+
 import atomicarray
 
 from envs import create_env
@@ -59,12 +61,13 @@ class Runner(object):
     timing.append(time.time()); self.local_weights = self.policy.get_weights()
     timing.append(time.time()); rollout = self.pull_batch_from_queue()
     timing.append(time.time()); batch = process_rollout(rollout, gamma=0.99, lambda_=1.0)
-    timing.append(time.time()); gradient, summinfo = self.policy.get_gradients(batch, summarize=True)
+    timing.append(time.time()); gradient, summinfo, metadata = self.policy.get_gradients(batch, summarize=True)
     timing.append(time.time()); self.summary_writer.add_summary(tf.Summary.FromString(summinfo), self.policy.local_steps)
     self.summary_writer.flush()
     info = {"id": self.id,
             "size": len(batch.a),
-            "time": timing}
+            "time": timing,
+            "metadata": metadata}
     return gradient, info
 
   def apply_delta(self, delta):
@@ -90,6 +93,12 @@ class Runner(object):
         cur_timing.append(time.time()); delta = parameter_delta(new_params, self.local_weights)
         cur_timing.append(time.time()); self.apply_delta(delta)
         cur_timing.append(time.time());  timing.append(cur_timing)
+        if i % 50 == 1:
+            md = info['metadata']
+            tl = timeline.Timeline(md.step_stats)
+            ctf = tl.generate_chrome_trace_format()
+            with open(os.path.join(self.logdir, "worker%d_%d.json" % (self.id, i)), 'w') as f:
+                f.write(ctf)
     return timing
 
 
@@ -104,14 +113,14 @@ def train(num_workers, env_name="PongDeterministic-v3"):
   s_id = ray.put(shapes)
   agents = []
   for i in range(num_workers):
-    agents.append(Runner.remote(env_name, i))
+    agents.append(Runner.remote(env_name, i, "result_%d" % num_workers))
     time.sleep(0.3)
   delta_list = [agent.start_train.remote(p_id, s_id)
                    for agent in agents]
   data = ray.get(delta_list)
-  import pickle
-  dump = lambda x: pickle.dump(data, open(x, 'wb'))
-  import ipdb; ipdb.set_trace()
+  # import pickle
+  # dump = lambda x: pickle.dump(data, open(x, 'wb'))
+  # import ipdb; ipdb.set_trace()
   return ps.get_policy()
 
 

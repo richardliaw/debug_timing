@@ -82,7 +82,10 @@ class LSTMPolicy(Policy):
     summary = None
     if summarize:
         grad, summary = self.sess.run([self.grads, self.summary_op], feed_dict=feed_dict)
-    return self.sess.run(self.grads, feed_dict=feed_dict), summary
+    run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+    run_metadata = tf.RunMetadata()
+    
+    return self.sess.run(self.grads, feed_dict=feed_dict, options=run_options, run_metadata=run_metadata), summary, run_metadata
 
   def act(self, ob, c, h):
     return self.sess.run([self.sample, self.vf] + self.state_out,
