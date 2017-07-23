@@ -4,8 +4,10 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
+import time
 import tensorflow.contrib.rnn as rnn
 import distutils.version
+from misc import get_time_tf
 from policy import (categorical_sample, conv2d, linear, flatten,
                     normalized_columns_initializer, Policy)
 
@@ -70,6 +72,7 @@ class LSTMPolicy(Policy):
     The LSTM needs its hidden states in order to compute the gradient
     accurately.
     """
+    f_start = time.time()
     feed_dict = {
         self.x: batch.si,
         self.ac: batch.a,
@@ -80,12 +83,21 @@ class LSTMPolicy(Policy):
     }
     self.local_steps += 1
     summary = None
-    if summarize:
-        grad, summary = self.sess.run([self.grads, self.summary_op], feed_dict=feed_dict)
-    run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-    run_metadata = tf.RunMetadata()
+    # run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+    # run_metadata = tf.RunMetadata()
+    run_metadata = None
+    profiled_time = None
+    start = time.time()
+    results, summary =  self.sess.run([self.grads, self.summary_op], feed_dict=feed_dict) #, options=run_options, run_metadata=run_metadata)
+    total_time = time.time() - f_start
+    run_time = time.time() - start
+    # if self.local_steps % 20 == 0:
+    #     print("InCompute: %f" % total_time)
+    if total_time > 0.9:
+        profiled_time = get_time_tf(run_metadata)
+        print("## Self: %0.4f\t Self-Run: % 0.4f\t TF: %0.4f" % (total_time, run_time, profiled_time))
     
-    return self.sess.run(self.grads, feed_dict=feed_dict, options=run_options, run_metadata=run_metadata), summary, run_metadata
+    return results, summary, run_metadata
 
   def act(self, ob, c, h):
     return self.sess.run([self.sample, self.vf] + self.state_out,

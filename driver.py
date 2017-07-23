@@ -87,18 +87,18 @@ class Runner(object):
         cur_timing = []
         cur_timing.append(time.time()); self.local_weights = {k: v.reshape(self.shapes[k]) for k, v in self.weights.items()}
         cur_timing.append(time.time()); gradient, info = self.compute_gradient(self.local_weights)
-        cur_timing.extend(info['time']);
+        cur_timing.extend(info['time']); # print("Compute: %f" % (info['time'][-1] - info['time'][-2]))
         cur_timing.append(time.time()); self.policy.model_update(gradient)
         cur_timing.append(time.time()); new_params = self.policy.get_weights()
         cur_timing.append(time.time()); delta = parameter_delta(new_params, self.local_weights)
         cur_timing.append(time.time()); self.apply_delta(delta)
         cur_timing.append(time.time());  timing.append(cur_timing)
-        if i % 50 == 1:
-            md = info['metadata']
-            tl = timeline.Timeline(md.step_stats)
-            ctf = tl.generate_chrome_trace_format()
-            with open(os.path.join(self.logdir, "worker%d_%d.json" % (self.id, i)), 'w') as f:
-                f.write(ctf)
+        # if i % 50 == 1:
+        #     md = info['metadata']
+        #     tl = timeline.Timeline(md.step_stats)
+        #     ctf = tl.generate_chrome_trace_format()
+        #     with open(os.path.join(self.logdir, "worker%d_%d.json" % (self.id, i)), 'w') as f:
+        #         f.write(ctf)
     return timing
 
 
@@ -118,9 +118,9 @@ def train(num_workers, env_name="PongDeterministic-v3"):
   delta_list = [agent.start_train.remote(p_id, s_id)
                    for agent in agents]
   data = ray.get(delta_list)
-  # import pickle
-  # dump = lambda x: pickle.dump(data, open(x, 'wb'))
-  # import ipdb; ipdb.set_trace()
+  import pickle
+  dump = lambda x: pickle.dump(data, open(x, 'wb'))
+  dump('results%d.p' % num_workers)
   return ps.get_policy()
 
 

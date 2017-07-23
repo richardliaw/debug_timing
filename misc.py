@@ -6,7 +6,16 @@ from datetime import datetime
 import cProfile
 import io
 import pstats
+from tensorflow.python.client import timeline
+import json
 
+
+def get_time_tf(metadata):
+    tl = timeline.Timeline(metadata.step_stats)
+    data = tl.generate_chrome_trace_format()
+    data = json.loads(data)
+    times = [x['ts'] for x in data['traceEvents'] if 'ts' in x]
+    return 0.000001 * (max(times) - min(times))
 
 def timestamp():
   return datetime.now().timestamp()
